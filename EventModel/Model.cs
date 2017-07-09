@@ -1,4 +1,5 @@
-﻿using System;
+﻿using EventModel.Blocks;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,12 +7,6 @@ using System.Threading.Tasks;
 
 namespace EventModel
 {
-    public abstract class Producer
-    {
-
-    }
-
-
     public class R1 : Producer
     {
 
@@ -32,78 +27,44 @@ namespace EventModel
 
     }
 
-    public abstract class SourceEvent<TOutput>
-        where TOutput : Producer
+    
+    public class OrderEvent : Event<R1, R1>
     {
 
     }
 
-    public abstract class SourceEvent<TInput, TOutput> : SourceEvent<TOutput>
-        where TInput : Producer
-        where TOutput : Producer
+    public class SelfOrderEvent : ForkedEvent<OrderEvent, R1, R1>
+    {
+
+    }
+    
+
+    public class RMAOrderEvent : ForkedEvent<OrderEvent, R1, RMA>
     {
 
     }
 
-    internal interface IProducableFork<TInput>
-        where TInput : Producer
+    public class SuperOrderEvent : ForkedEvent<OrderEvent, R1, Super>
     {
 
     }
 
-    internal interface IConsumableFork<TInput>
-        where TInput : Producer
+    public class SuperRMAOrderEvent : ForkedEvent<RMAOrderEvent, RMA, Super>
     {
 
     }
 
-    public abstract class EnrichedEvent<TSourceEvent, TInput, TOutput> : SourceEvent<TInput, TOutput>, IProducableFork<TInput>, IConsumableFork<TOutput>
-        where TSourceEvent : SourceEvent<TInput>
-        where TInput : Producer
-        where TOutput : Producer
-    {
-
-    }
-
-    public class OrderEvent : SourceEvent<R1, R1>
-    {
-
-    }
-
-    public class RMAOrderEvent : EnrichedEvent<OrderEvent, R1, RMA>
-    {
-
-    }
-
-    public class SuperOrderEvent : EnrichedEvent<OrderEvent, R1, Super>
-    {
-
-    }
-
-    public class SuperRMAOrderEvent : EnrichedEvent<RMAOrderEvent, RMA, Super>
-    {
-
-    }
-
-    public class SuperMegaRMAOrderEvent : EnrichedEvent<SuperRMAOrderEvent, Super, Mega>
-    {
-
-    }
-
-    public abstract class EventEnricher<TEvent, TInput>
-        where TEvent : SourceEvent<TInput>
-        where TInput : Producer
-    {
-
-    }
-
-    public abstract class SuperEventEnricher<TEvent> : EventEnricher<TEvent, Super>
-        where TEvent : SourceEvent<Super>
+    public class SuperMegaRMAOrderEvent : ForkedEvent<SuperRMAOrderEvent, Super, Mega>
     {
 
     }
 
     public class SuperRMAOrderEventEnricher : SuperEventEnricher<SuperRMAOrderEvent>
+    {
+
+    }
+
+    public class SuperSelfOrderEvent : ForkedEvent<SelfOrderEvent, R1, Super>
     {
 
     }

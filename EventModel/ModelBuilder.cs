@@ -1,4 +1,5 @@
-﻿using System;
+﻿using EventModel.Blocks;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,139 +9,135 @@ namespace EventModel
 {
     public class ModelBuilder
     {
-        private static Dictionary<Type, ModelBuilder> _instances = new Dictionary<Type, ModelBuilder>();
-
-        public static ModelBuilder Create<TProducer>()
-            where TProducer : Producer
+        public static IReadOnlyCollection<SourceEventObjectModel> Create()
         {
-            var t = typeof(TProducer);
-            if (!_instances.TryGetValue(t, out ModelBuilder builder))
+            var allTypes = typeof(Producer).Assembly.GetTypes();
+
+            var events = (
+                from q in allTypes
+                let category = GetEventCategory(q)
+                where category == EventCategory.ForkedEvent || category == EventCategory.SourceEvent
+                select new { Type = q, EventCategory = category }
+             ).ToArray();
+
+
+            var sourceEventModels = events.Where(e => e.EventCategory == EventCategory.SourceEvent)
+                                           .Select(e => new SourceEventObjectModel(e.Type))
+                                           .ToArray();
+
+            var forksBySorceType = events.Where(e => e.EventCategory == EventCategory.ForkedEvent)
+                                         .GroupBy(e => e.Type.BaseType.GetGenericArguments()[0])
+                                         .ToDictionary(e => e.Key, e => e.Select(q => q.Type).ToArray());
+            
+            foreach (var sourceEventModel in sourceEventModels)
             {
-                builder = new ModelBuilder(t);
-                _instances[t] = builder;
+                FindForksToModel(sourceEventModel, forksBySorceType);
             }
 
-            return builder;
+            return sourceEventModels;
         }
 
-        internal static ModelBuilder CreateInternal(Type producer)
+        private static void FindForksToModel(EventObjectModel eventObjectModel, IReadOnlyDictionary<Type, Type[]> forksBySorceType)
         {
-            return (ModelBuilder)typeof(ModelBuilder).GetMethod(nameof(Create)).MakeGenericMethod(producer).Invoke(null, null);
+            if (forksBySorceType.TryGetValue(eventObjectModel.EventType, out Type[] forks))
+            {
+                foreach (var fork in forks)
+                {
+                    var model = new ForkedEventObjectModel(eventObjectModel, fork);
+                    eventObjectModel.AddFork(model);
+                    FindForksToModel(model, forksBySorceType);
+                }
+            }
         }
 
-        public ProducedEvent[] ProducedEvents { get; }
-        public ProducedEventFork[] ProducedEventForks { get; }
-        public ConsumedEventFork[] ConsumedEventForks { get; }
-
-
-        private ModelBuilder(Type producer)
+        private static EventCategory GetEventCategory(Type type)
         {
-            var types = GetType().Assembly.GetTypes();
+            if (type.BaseType == typeof(object) || type.BaseType == typeof(ValueType) || type.BaseType == null)
+            {
+                return EventCategory.None;
+            }
 
-            ProducedEvents = (
-                from q in types
-                where typeof(SourceEvent<,>).MakeGenericType(producer, producer).IsAssignableFrom(q.BaseType)
-                select new ProducedEvent(producer, q)
-            ).ToArray();
+            var currentTypeGeneric = type.IsGenericType ? type.GetGenericTypeDefinition() : null;
 
-            var forksFromOwnedTypes = (
-                from q in ProducedEvents
-                from z in types
-                where typeof(IProducableFork<>).MakeGenericType(producer).IsAssignableFrom(z)
-                let sourceType = z.BaseType.GetGenericArguments()[0]
-                where sourceType == q.EventType
-                select new ProducedEventFork(
-                       @event: q,
-                       forkType: z,
-                       forkTo: z.BaseType.GetGenericArguments()[2]
-                )
-            ).ToArray();
+            if (type.BaseType?.IsGenericType == true 
+                && currentTypeGeneric != typeof(ForkedEvent<,,>)
+                && currentTypeGeneric != typeof(Event<,>))
+            {
+                var baseTypeGenericDefinition = type.BaseType.GetGenericTypeDefinition();
+                if (baseTypeGenericDefinition == typeof(Event<,>))
+                {
+                    return EventCategory.SourceEvent;
+                }
+                else if (baseTypeGenericDefinition == typeof(ForkedEvent<,,>))
+                {
+                    return EventCategory.ForkedEvent;
+                }
+            }
 
-            var forksFromOtherForks = (
-                from z in types
-                where typeof(IProducableFork<>).MakeGenericType(producer).IsAssignableFrom(z)
-                let sourceType = z.BaseType.GetGenericArguments()[0]
-                where sourceType.BaseType.GetGenericTypeDefinition() == typeof(EnrichedEvent<,,>)
-                let originalProducer = sourceType.BaseType.GetGenericArguments()[1]
-                let model = CreateInternal(originalProducer)
-                let originalFork = model.ProducedEventForks.FirstOrDefault(q => q.ForkType == sourceType)
-                let originalEvent = model.ProducedEvents.FirstOrDefault(q => q.EventType == sourceType)
-                select originalFork != null 
-                       ? new ProducedEventFork(originalFork, z, z.BaseType.GetGenericArguments()[2])
-                       : (originalEvent != null 
-                          ? new ProducedEventFork(originalEvent, z, z.BaseType.GetGenericArguments()[2]) 
-                          : throw new InvalidOperationException())
-            ).ToArray();
-
-            ProducedEventForks = forksFromOwnedTypes.Concat(forksFromOtherForks).ToArray();
-
-            ConsumedEventForks = (
-                from z in types
-                where typeof(IConsumableFork<>).MakeGenericType(producer).IsAssignableFrom(z)
-                let sourceProducer = z.BaseType.GetGenericArguments()[1]
-                let sourceModel = CreateInternal(sourceProducer)
-                select new ConsumedEventFork(
-                    sourceModel.ProducedEventForks.Single(e => e.ForkType == z)
-                )
-            ).ToArray();
+            return GetEventCategory(type.BaseType);
         }
     }
-   
-    public class ProducedEvent 
+
+
+
+    public abstract class EventObjectModel
     {
-        public Type Producer { get; }
+        private readonly HashSet<ForkedEventObjectModel> _directForks;
+
         public Type EventType { get; }
+        public Type ProducerType { get; protected set; }
+        public abstract EventCategory Category { get; }
+        public bool IsLocal { get; protected set; }
+        public IReadOnlyCollection<ForkedEventObjectModel> DirectForks => _directForks;
 
-        public ProducedEvent(Type producer, Type eventType)
+        public EventObjectModel(Type eventType)
         {
-            Producer = producer;
+            _directForks = new HashSet<ForkedEventObjectModel>();
             EventType = eventType;
-            FullName = $"{producer.Name}-{eventType.Name}";
         }
 
-        public string FullName { get; }
-    }
-    
-    public interface IConsumedFork
-    {
-        ProducedEvent Event { get; }
-        string FullName { get; }
+        internal void AddFork(ForkedEventObjectModel fork)
+        {
+            _directForks.Add(fork);
+        }
     }
 
-    public class ProducedEventFork  : IConsumedFork
+    public class SourceEventObjectModel : EventObjectModel
     {
-        public ProducedEvent Event { get; }
-        public ProducedEventFork Fork { get; }
-        public Type ForkType { get; }
-        public Type ForkTo { get; }
+        public override EventCategory Category => EventCategory.SourceEvent;
 
-        public ProducedEventFork(ProducedEvent @event, Type forkType, Type forkTo)
+        public SourceEventObjectModel(Type eventType) 
+            : base(eventType)
         {
-            Event = @event;
-            ForkTo = forkTo;
-            ForkType = forkType;
-            FullName = $"{@event.FullName}-{forkTo.Name}";
+            ProducerType = eventType.BaseType.GetGenericArguments()[0];
+            IsLocal = true;
         }
-
-        public ProducedEventFork(ProducedEventFork fork, Type forkType, Type forkTo)
-        {
-            Fork = fork;
-            Event = fork.Event;
-            ForkTo = forkTo;
-            ForkType = forkType;
-            FullName = $"{fork.FullName}-{forkTo.Name}";
-        }
-
-        public string FullName { get; }
     }
 
-    public class ConsumedEventFork
+    public class ForkedEventObjectModel : EventObjectModel
     {
-        public IConsumedFork Fork { get; }
+        public EventObjectModel SourceEvent { get; }
+        public override EventCategory Category => EventCategory.ForkedEvent;
 
-        public ConsumedEventFork(IConsumedFork fork)
+        public ForkedEventObjectModel(EventObjectModel sourceEvent, Type eventType) 
+            : base(eventType)
         {
-            Fork = fork;
+            var genericArgs = eventType.BaseType.GetGenericArguments();
+            ProducerType = genericArgs[1];
+            IsLocal = genericArgs[1] == genericArgs[2];
         }
+    }
+
+
+    public enum EventCategory
+    {
+        None = 0,
+        SourceEvent = 1,
+        ForkedEvent = 2
+    }
+
+    public class EventModel
+    {
+
     }
 }
