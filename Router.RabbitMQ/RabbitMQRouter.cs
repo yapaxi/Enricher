@@ -13,62 +13,57 @@ namespace Router.RabbitMQ
 {
     public class RabbitMQRouter
     {
-        private readonly Assembly _eventModelAssembly;
         private readonly IBus _enrichmentBus;
+        private IReadOnlyCollection<SourceEventObjectModel> _models;
 
-        public RabbitMQRouter(IBus enrichmentBus,  Assembly eventModelAssembly)
+        public RabbitMQRouter(IBus enrichmentBus, IReadOnlyCollection<SourceEventObjectModel> models)
         {
-            _eventModelAssembly = eventModelAssembly;
             _enrichmentBus = enrichmentBus;
+            _models = models;
         }
 
-        //public void BuildRoutes()
-        //{
-        //    var producers = _eventModelAssembly.ExportedTypes.Where(e => e.BaseType == typeof(Producer)).ToArray();
+        public void BuildRoutes()
+        {
+            foreach (var model in _models)
+            {
+                BuildRoutesForSource(model);
+            }
+        }
 
-        //    var sources = new Dictionary<ProducedEvent, IExchange>();
+        private void BuildRoutesForSource(SourceEventObjectModel model)
+        {
+            var exchange = BuildRabbiqMQRoutesForSourceEvent(model);
+            foreach (var fork in model.DirectForks)
+            {
+                BuildRoutesForFork(exchange, fork);
+            }
+        }
 
-        //    foreach (var producer in producers)
-        //    {
-        //        var model = ModelBuilder.Create(producer);
+        private void BuildRoutesForFork(IExchange exchange, ForkedEventObjectModel model)
+        {
+            var forkOutputExchange = BuildRabbitMQRoutesForForkedEvent(exchange, model);
+            foreach (var fork in model.DirectForks)
+            {
+                BuildRoutesForFork(forkOutputExchange, fork);
+            }
+        }
 
-        //        foreach (var producedEvent in model.ProducedEvents)
-        //        {
-        //            var sourceExchange = BuildProducedEventSource(producedEvent);
-        //            sources.Add(producedEvent, sourceExchange);
-        //        }
+        private IExchange BuildRabbiqMQRoutesForSourceEvent(SourceEventObjectModel model)
+        {
+            var exchange = _enrichmentBus.Advanced.ExchangeDeclare(model.OutputFullName, "fanout", durable: true);
+            var queue = _enrichmentBus.Advanced.QueueDeclare(model.OutputFullName, durable: true);
+            _enrichmentBus.Advanced.Bind(exchange, queue, "");
+            return exchange;
+        }
 
-        //        foreach (var fork in model.ProducedEventForks)
-        //        {
-        //            var sourceExchange = GetByKey(fork.Event, sources, () => new InvalidOperationException($"[Internal Error] Failed to found exchange for event \"{fork.Event.FullName}\""));
-        //            BuildSourceFork(sourceExchange, fork);
-        //        }
-        //    }
-        //}
+        private IExchange BuildRabbitMQRoutesForForkedEvent(IExchange sourceExchange, ForkedEventObjectModel fork)
+        {
+            var inputQueue = _enrichmentBus.Advanced.QueueDeclare(fork.InputFullName, durable: true);
+            _enrichmentBus.Advanced.Bind(sourceExchange, inputQueue, "");
 
-        //private TResult GetByKey<TKey, TResult>(TKey key, IDictionary<TKey, TResult> dict, Func<Exception> onNotFound)
-        //{
-        //    TResult r;
-        //    if (!dict.TryGetValue(key, out r))
-        //    {
-        //        throw onNotFound();
-        //    }
-        //    return r;
-        //}
-
-        //private IExchange BuildProducedEventSource(ProducedEvent @event)
-        //{
-        //    var exchange = _enrichmentBus.Advanced.ExchangeDeclare(@event.FullName, "fanout", durable: true);
-        //    var queue = _enrichmentBus.Advanced.QueueDeclare(@event.FullName, durable: true);
-        //    _enrichmentBus.Advanced.Bind(exchange, queue, "");
-        //    return exchange;
-        //}
-
-        //private IQueue BuildSourceFork(IExchange sourceExchange, ProducedEventFork fork)
-        //{
-        //    var queue = _enrichmentBus.Advanced.QueueDeclare(fork.FullName, durable: true);
-        //    _enrichmentBus.Advanced.Bind(sourceExchange, queue, "");
-        //    return queue;
-        //}
+            var outputExchange = _enrichmentBus.Advanced.ExchangeDeclare(fork.OutputFullName, "fanout", durable: true);
+            var outputQueue = _enrichmentBus.Advanced.QueueDeclare(fork.OutputFullName, durable: true);
+            return outputExchange;
+        }
     }
 }

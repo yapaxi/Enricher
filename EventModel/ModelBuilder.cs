@@ -89,6 +89,7 @@ namespace EventModel
         public abstract EventCategory Category { get; }
         public bool IsLocal { get; protected set; }
         public IReadOnlyCollection<ForkedEventObjectModel> DirectForks => _directForks;
+        public abstract string OutputFullName { get; }
 
         public EventObjectModel(Type eventType)
         {
@@ -105,6 +106,7 @@ namespace EventModel
     public class SourceEventObjectModel : EventObjectModel
     {
         public override EventCategory Category => EventCategory.SourceEvent;
+        public override string OutputFullName => EventType.Name;
 
         public SourceEventObjectModel(Type eventType) 
             : base(eventType)
@@ -118,6 +120,8 @@ namespace EventModel
     {
         public EventObjectModel SourceEvent { get; }
         public override EventCategory Category => EventCategory.ForkedEvent;
+        public string InputFullName => $"{GetOutputFullName(SourceEvent)}:{EventType.Name}:input";
+        public override string OutputFullName => $"{GetOutputFullName(SourceEvent)}:{EventType.Name}:output";
 
         public ForkedEventObjectModel(EventObjectModel sourceEvent, Type eventType) 
             : base(eventType)
@@ -125,6 +129,18 @@ namespace EventModel
             var genericArgs = eventType.BaseType.GetGenericArguments();
             ProducerType = genericArgs[1];
             IsLocal = genericArgs[1] == genericArgs[2];
+            SourceEvent = sourceEvent;
+        }
+
+        private static string GetOutputFullName(EventObjectModel model)
+        {
+            switch (model)
+            {
+                case SourceEventObjectModel x1: return x1.OutputFullName;
+                case ForkedEventObjectModel x2: return x2.OutputFullName;
+                default:
+                    throw new InvalidOperationException($"Unexpected type of model: {model.GetType().Name}");
+            }
         }
     }
 
