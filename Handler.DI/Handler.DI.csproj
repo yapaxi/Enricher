@@ -4,16 +4,15 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{503D2CFE-EE39-4448-9699-6D7E16D6C364}</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>Enricher</RootNamespace>
-    <AssemblyName>Enricher</AssemblyName>
+    <ProjectGuid>{6088EB26-D60B-4CE3-8F68-E3988B5659EA}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Handler.DI</RootNamespace>
+    <AssemblyName>Handler.DI</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -23,7 +22,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -35,14 +33,8 @@
     <Reference Include="Autofac, Version=4.6.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
       <HintPath>..\packages\Autofac.4.6.0\lib\net45\Autofac.dll</HintPath>
     </Reference>
-    <Reference Include="EasyNetQ, Version=1.1.4.506, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\EasyNetQ.1.1.4.506\lib\net45\EasyNetQ.dll</HintPath>
-    </Reference>
     <Reference Include="NLog, Version=4.0.0.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
       <HintPath>..\packages\NLog.4.4.11\lib\net45\NLog.dll</HintPath>
-    </Reference>
-    <Reference Include="RabbitMQ.Client, Version=3.6.0.0, Culture=neutral, PublicKeyToken=89e7d7c5feba84ce, processorArchitecture=MSIL">
-      <HintPath>..\packages\RabbitMQ.Client.3.6.0\lib\net45\RabbitMQ.Client.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -57,34 +49,25 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
+    <Compile Include="HandlerModule.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="App.config" />
-    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\EventModel\EventModel.csproj">
       <Project>{24457cfa-6f85-4b52-a3dd-ef068cbabc90}</Project>
       <Name>EventModel</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Handler.DI\Handler.DI.csproj">
-      <Project>{6088eb26-d60b-4ce3-8f68-e3988b5659ea}</Project>
-      <Name>Handler.DI</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Handler\Handler.csproj">
-      <Project>{F08C0097-ED9E-4694-B332-4FC32F53AB0D}</Project>
+      <Project>{f08c0097-ed9e-4694-b332-4fc32f53ab0d}</Project>
       <Name>Handler</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Router.RabbitMQ\Enricher.RabbitMQ.csproj">
-      <Project>{d4d187f8-49eb-48e6-a84d-3c798bfc2c12}</Project>
-      <Name>Enricher.RabbitMQ</Name>
-    </ProjectReference>
     <ProjectReference Include="..\Router\Router.csproj">
-      <Project>{90CC0D76-3D9F-4450-B95B-FB6E07F227D9}</Project>
+      <Project>{90cc0d76-3d9f-4450-b95b-fb6e07f227d9}</Project>
       <Name>Router</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

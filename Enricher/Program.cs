@@ -1,73 +1,122 @@
-﻿using EasyNetQ;
+﻿using Autofac;
+using EasyNetQ;
 using EasyNetQ.Topology;
 using EventModel;
+using EventModel.Blocks;
+using Handler;
+using Handler.DI;
+using NLog;
 using RabbitMQ.Client;
+using Router;
 using Router.RabbitMQ;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Enricher
 {
     class Program
     {
+        public class RMAOrderEventHandler : ForkHandlerBase<R1, OrderEvent, RMAOrderEvent>
+        {
+            private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+            public async override Task<RMAOrderEvent> Handle(OrderEvent input)
+            {
+                Logger.Info("Got order event");
+                return new RMAOrderEvent();
+            }
+        }
+
+        public class SelfOrderEventHandler : ForkHandlerBase<R1, OrderEvent, SelfOrderEvent>
+        {
+            private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+
+            public async override Task<SelfOrderEvent> Handle(OrderEvent input)
+            {
+                Logger.Info("Got order event");
+                return new SelfOrderEvent();
+            }
+        }
 
         static void Main(string[] args)
         {
             var models = ModelBuilder.Create();
-            PrintModels(models);
+            
+            var containerBuilder = new ContainerBuilder();
+            containerBuilder.RegisterModule(new HandlerModule());
+            containerBuilder
+                .Register(e => RabbitHutch.CreateBus("host=192.168.100.6;timeout=120;virtualHost=routing-model;username=test;password=test"))
+                .As<IBus>()
+                .SingleInstance();
+            containerBuilder.RegisterType<RabbitMQForkSubscriber>()
+                .As<IForkSubscriber>()
+                .SingleInstance();
+            containerBuilder.RegisterType<RabbitMQRouter>().As<IRouter>().SingleInstance();
+            containerBuilder.RegisterInstance(models);
+            containerBuilder.RegisterType<RabbitMQPublisher>().As<IDataPublisher>().InstancePerMatchingLifetimeScope("level2");
 
-            using (var bus = RabbitHutch.CreateBus("host=192.168.100.6;timeout=120;virtualHost=routing-model;username=test;password=test"))
+            RegisterProducer<R1>(containerBuilder);
+            RegisterProducer<RMA>(containerBuilder);
+
+            containerBuilder
+                .RegisterType<RMAOrderEventHandler>()
+                .As<IForkHandler<RMAOrderEvent>>()
+                .InstancePerLifetimeScope();
+
+            containerBuilder
+                .RegisterType<SelfOrderEventHandler>()
+                .As<IForkHandler<SelfOrderEvent>>()
+                .InstancePerLifetimeScope();
+
+            using (var container = containerBuilder.Build())
             {
-                var router = new RabbitMQRouter(bus, models);
-                router.BuildRoutes();
+                var t = new Thread(() => RunProducer<RMA>(container));
+                t.Start();
 
-                var model = models.First();
-
-                foreach (var fork in model.DirectForks)
-                {
-                    RecursiveConsume(bus.Advanced, fork);
-                }
-
-                bus.Advanced.Publish(new Exchange(model.OutputFullName), "", false, new MessageProperties(), new byte[] { 0x01, 0x02, 0x03 });
-
-                Console.ReadKey(true);
+                RunProducer<R1>(
+                    container, 
+                    publisherAction: e =>
+                    {
+                        while (true)
+                        {
+                            e.Publish(new OrderEvent()).Wait();
+                            Console.WriteLine("Published");
+                            Console.ReadKey(true);
+                        }
+                    });
             }
         }
 
-        private static void RecursiveConsume(IAdvancedBus bus, ForkedEventObjectModel model)
+        private static void RegisterProducer<TProducer>(ContainerBuilder containerBuilder)
+            where TProducer : Producer
         {
-            bus.Consume(new Queue(model.InputFullName, false), (a, b, c) => {
-                Console.WriteLine($"Consumed {a.Length} bytes from {model.InputFullName}");
-                bus.Publish(new Exchange(model.OutputFullName), "", false, new MessageProperties(), a);
-            });
-
-            foreach (var fork in model.DirectForks)
-            {
-                RecursiveConsume(bus, fork);
-            }
+            containerBuilder.RegisterType<SourceEventPublisher<TProducer>>().InstancePerMatchingLifetimeScope("level2");
+            containerBuilder.RegisterType<ForkListener<TProducer>>().InstancePerMatchingLifetimeScope("level2");
         }
 
-        private static void PrintModels(IReadOnlyCollection<SourceEventObjectModel> models)
+        private static void RunProducer<TProducer>(ILifetimeScope outerScope, Action<SourceEventPublisher<TProducer>> publisherAction = null)
+            where TProducer : Producer
         {
-            models.ToList().ForEach(Print);
+            var router = outerScope.Resolve<IRouter>();
+            var routes = router.BuildRoutes();
+            var localRoutes = routes.Filter<TProducer>();
 
-            void Print(EventObjectModel model)
+            using (var scope = outerScope.BeginLifetimeScope("level2", (e) => e.RegisterInstance(localRoutes)))
             {
-                Console.WriteLine(model.OutputFullName);
+                var listener = scope.Resolve<ForkListener<TProducer>>();
+                listener.Start();
 
-                if (model is ForkedEventObjectModel x)
-                {
-                    Console.WriteLine($"---from {x.InputFullName})");
-                }
+                var publisher = scope.Resolve<SourceEventPublisher<TProducer>>();
 
-                foreach (var innerModel in model.DirectForks)
-                {
-                    Print(innerModel);
-                }
+                Console.WriteLine($"Started {typeof(TProducer).Name}");
+                publisherAction?.Invoke(publisher);
+                Thread.CurrentThread.Join();
             }
+            Console.WriteLine($"Stoped {typeof(TProducer).Name}");
         }
     }
 }

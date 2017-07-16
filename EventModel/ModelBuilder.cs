@@ -85,7 +85,8 @@ namespace EventModel
         private readonly HashSet<ForkedEventObjectModel> _directForks;
 
         public Type EventType { get; }
-        public Type ProducerType { get; protected set; }
+        public Type FromProducerType { get; protected set; }
+        public Type ToProducerType { get; protected set; }
         public abstract EventCategory Category { get; }
         public bool IsLocal { get; protected set; }
         public IReadOnlyCollection<ForkedEventObjectModel> DirectForks => _directForks;
@@ -111,7 +112,8 @@ namespace EventModel
         public SourceEventObjectModel(Type eventType) 
             : base(eventType)
         {
-            ProducerType = eventType.BaseType.GetGenericArguments()[0];
+            FromProducerType = eventType.BaseType.GetGenericArguments()[0];
+            ToProducerType = FromProducerType;
             IsLocal = true;
         }
     }
@@ -127,7 +129,8 @@ namespace EventModel
             : base(eventType)
         {
             var genericArgs = eventType.BaseType.GetGenericArguments();
-            ProducerType = genericArgs[1];
+            FromProducerType = genericArgs[1];
+            ToProducerType = genericArgs[2];
             IsLocal = genericArgs[1] == genericArgs[2];
             SourceEvent = sourceEvent;
         }
