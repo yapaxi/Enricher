@@ -65,7 +65,11 @@ namespace Enricher
 
                     while (true)
                     {
-                        r1publisher.Publish(new OrderEvent()).Wait();
+                        r1publisher.Publish(new OrderEvent()
+                        {
+                            Id = Math.Abs(Guid.NewGuid().GetHashCode()) % 1000000,
+                            OrderRequestId = Guid.NewGuid().ToString()
+                        }).Wait();
                         Console.WriteLine("Published");
                         Console.ReadKey(true);
                     }

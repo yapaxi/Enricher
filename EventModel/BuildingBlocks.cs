@@ -66,4 +66,11 @@ namespace EventModel.Blocks
     {
 
     }
+
+    public class RouteNameAttribute : Attribute
+    {
+        public string Name { get; }
+
+        public RouteNameAttribute(string name) => Name = name;
+    }
 }

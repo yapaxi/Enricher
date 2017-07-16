@@ -1,8 +1,10 @@
 ﻿using EventModel.Blocks;
+using Newtonsoft.Json;
 using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,16 +14,42 @@ namespace Handler
         where TInputProducer : Producer
         where TOutputProducer : Producer
         where TInput : IEvent<TInputProducer>
-        where TFork : IEventFork<TInput, TInputProducer>
+        where TFork : ForkedEvent<TInput, TInputProducer, TOutputProducer>
     {
         protected static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
-        public abstract Task<TFork> Handle(TInput input);
+        private readonly PropertyInfo[] _properties;
+        private readonly EventPublisher<TOutputProducer> _publisher;
 
-        async Task<(object Instance, Type InputType, Type OutputType)> IForkHandler.Handle(object input)
+        public ForkHandlerBase(EventPublisher<TOutputProducer> publisher)
         {
-            var result = await Handle((TInput)input);
-            return (result, typeof(TInput), typeof(TFork));
+            _properties = (
+                from q in typeof(TFork).GetInterfaces()
+                where q.FullName.EndsWith("+IModel") && q.DeclaringType != typeof(TFork)
+                from p in q.GetProperties()
+                select p
+            ).ToArray();
+
+            _publisher = publisher;
+        }
+
+        private async Task HandleInternal(TInput input)
+        {
+            var fork = await Handle(input);
+
+            foreach (var p in _properties)
+            {
+               p.SetValue(fork, p.GetValue(input));
+            }
+
+            await _publisher.Publish(fork);
+        }
+
+        protected abstract Task<TFork> Handle(TInput input);
+
+        async Task IForkHandler.Handle(object input)
+        {
+            await HandleInternal((TInput)input);
         }
     }
 
@@ -31,19 +59,16 @@ namespace Handler
         where TInput : IEvent<TInputProducer>
         where TFork : ForkedEvent<TInput, TInputProducer, TOutputProducer>, new()
     {
-        private readonly EventPublisher<TOutputProducer> _publisher;
-
         public PassthroughHandler(EventPublisher<TOutputProducer> publisher)
+            : base(publisher)
         {
-            _publisher = publisher;
+
         }
 
-        public async override Task<TFork> Handle(TInput input)
+        protected override Task<TFork> Handle(TInput input)
         {
-            Logger.Info($"Passing through: {typeof(TInput).Name} -> {typeof(TFork).Name}");
-            var fork = new TFork();
-            await _publisher.Publish(fork);
-            return fork;
+            Logger.Info($"Passing through: {typeof(TInput).Name} -> {typeof(TFork).Name} ({JsonConvert.SerializeObject(input)})");
+            return Task.FromResult(new TFork());
         }
     }
 
@@ -53,6 +78,6 @@ namespace Handler
 
     public interface IForkHandler
     {
-        Task<(object Instance, Type InputType, Type OutputType)> Handle(object input);
+        Task Handle(object input);
     }
 }

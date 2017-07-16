@@ -65,12 +65,13 @@ namespace Router.RabbitMQ
 
         private IExchange BuildRabbitMQRoutesForForkedEvent(IExchange sourceExchange, ForkedEventObjectModel fork)
         {
-            Logger.Info($"Routing \"{sourceExchange.Name}\" to \"{fork.InputFullName}\"");
+            Logger.Info($"Routing: \"{sourceExchange.Name}\" to \"{fork.InputFullName}\"");
             var inputQueue = _enrichmentBus.Advanced.QueueDeclare(fork.InputFullName, durable: true);
             _enrichmentBus.Advanced.Bind(sourceExchange, inputQueue, "");
 
             var outputExchange = _enrichmentBus.Advanced.ExchangeDeclare(fork.OutputFullName, "fanout", durable: true);
             var outputQueue = _enrichmentBus.Advanced.QueueDeclare(fork.OutputFullName, durable: true);
+            _enrichmentBus.Advanced.Bind(outputExchange, outputQueue, "");
             return outputExchange;
         }
     }

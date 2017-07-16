@@ -27,45 +27,80 @@ namespace EventModel
 
     }
 
-    
-    public class OrderEvent : Event<R1, R1>
-    {
 
+    [RouteName("order")]
+    public class OrderEvent : Event<R1, R1>, OrderEvent.IModel
+    {
+        public interface IModel
+        {
+            int Id { get; set; }
+            string OrderRequestId { get; set; }
+        }
+
+        public OrderEvent() { }
+
+        public int Id { get; set; }
+
+        public string OrderRequestId { get; set; }
     }
 
-    public class SelfOrderEvent : ForkedEvent<OrderEvent, R1, R1>
+    [RouteName("self-order")]
+    public class SelfOrderEvent : ForkedEvent<OrderEvent, R1, R1>, OrderEvent.IModel
     {
-
-    }
-    
-
-    public class RMAOrderEvent : ForkedEvent<OrderEvent, R1, RMA>
-    {
-
+        public int Id { get; set; }
+        public string OrderRequestId { get; set; }
     }
 
-    public class SuperOrderEvent : ForkedEvent<OrderEvent, R1, Super>
-    {
 
+    [RouteName("rma-order")]
+    public class RMAOrderEvent : ForkedEvent<OrderEvent, R1, RMA>, OrderEvent.IModel, RMAOrderEvent.IModel
+    {
+        public interface IModel
+        {
+            int ClaimsCount { get; set; }
+        }
+
+        public int Id { get; set; }
+        public string OrderRequestId { get; set; }
+
+        public int ClaimsCount { get; set; }
     }
 
-    public class SuperRMAOrderEvent : ForkedEvent<RMAOrderEvent, RMA, Super>
+    [RouteName("super-order")]
+    public class SuperOrderEvent : ForkedEvent<OrderEvent, R1, Super>, OrderEvent.IModel
     {
-
+        public int Id { get; set; }
+        public string OrderRequestId { get; set; }
     }
 
-    public class SuperMegaRMAOrderEvent : ForkedEvent<SuperRMAOrderEvent, Super, Mega>
+    [RouteName("super-rma-order")]
+    public class SuperRMAOrderEvent : ForkedEvent<RMAOrderEvent, RMA, Super>, OrderEvent.IModel, RMAOrderEvent.IModel
     {
-
+        public int Id { get; set; }
+        public string OrderRequestId { get; set; }
+        public int ClaimsCount { get; set; }
     }
 
-    public class SelfSuperMegaRMAOrderEvent : ForkedEvent<SuperMegaRMAOrderEvent, Mega, Mega>
+    [RouteName("super-mega-rma-order")]
+    public class SuperMegaRMAOrderEvent : ForkedEvent<SuperRMAOrderEvent, Super, Mega>, OrderEvent.IModel, RMAOrderEvent.IModel
     {
-
+        public int Id { get; set; }
+        public string OrderRequestId { get; set; }
+        public int ClaimsCount { get; set; }
     }
 
-    public class SuperSelfOrderEvent : ForkedEvent<SelfOrderEvent, R1, Super>
+    [RouteName("self-super-mega-rma-order")]
+    public class SelfSuperMegaRMAOrderEvent : ForkedEvent<SuperMegaRMAOrderEvent, Mega, Mega>, OrderEvent.IModel, RMAOrderEvent.IModel
     {
+        public int Id { get; set; }
+        public string OrderRequestId { get; set; }
+        public int ClaimsCount { get; set; }
+    }
 
+    [RouteName("super-self-order")]
+    public class SuperSelfOrderEvent : ForkedEvent<SelfOrderEvent, R1, Super>, OrderEvent.IModel
+    {
+        public int Id { get; set; }
+        public string OrderRequestId { get; set; }
     }
 }

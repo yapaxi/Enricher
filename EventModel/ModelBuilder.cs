@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -106,12 +107,16 @@ namespace EventModel
 
     public class SourceEventObjectModel : EventObjectModel
     {
+        private readonly string _name;
+
         public override EventCategory Category => EventCategory.SourceEvent;
-        public override string OutputFullName => EventType.Name;
+        public override string OutputFullName => _name;
 
         public SourceEventObjectModel(Type eventType) 
             : base(eventType)
         {
+            _name = eventType.GetCustomAttribute<RouteNameAttribute>()?.Name ?? eventType.Name;
+
             FromProducerType = eventType.BaseType.GetGenericArguments()[0];
             ToProducerType = FromProducerType;
             IsLocal = true;
@@ -120,14 +125,18 @@ namespace EventModel
 
     public class ForkedEventObjectModel : EventObjectModel
     {
+        private readonly string _name;
+
         public EventObjectModel SourceEvent { get; }
         public override EventCategory Category => EventCategory.ForkedEvent;
-        public string InputFullName => $"{GetOutputFullName(SourceEvent)}:{EventType.Name}:input";
-        public override string OutputFullName => $"{GetOutputFullName(SourceEvent)}:{EventType.Name}:output";
+        public string InputFullName => $"{GetOutputFullName(SourceEvent)}:{_name}[i]";
+        public override string OutputFullName => $"{GetOutputFullName(SourceEvent)}:{_name}[o]";
 
         public ForkedEventObjectModel(EventObjectModel sourceEvent, Type eventType) 
             : base(eventType)
         {
+            _name = eventType.GetCustomAttribute<RouteNameAttribute>()?.Name ?? eventType.Name;
+
             var genericArgs = eventType.BaseType.GetGenericArguments();
             FromProducerType = genericArgs[1];
             ToProducerType = genericArgs[2];
