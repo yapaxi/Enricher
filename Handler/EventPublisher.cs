@@ -8,19 +8,19 @@ using System.Threading.Tasks;
 
 namespace Handler
 {
-    public class SourceEventPublisher<TProducer>
+    public class EventPublisher<TProducer>
         where TProducer : Producer
     {
         private readonly RouteCollection<TProducer> _routeCollection;
         private readonly IDataPublisher _publisher;
 
-        public SourceEventPublisher(RouteCollection<TProducer> routeCollection, IDataPublisher publisher)
+        public EventPublisher(RouteCollection<TProducer> routeCollection, IDataPublisher publisher)
         {
             _routeCollection = routeCollection;
             _publisher = publisher;
         }
 
-        public SourceEventPublisher(RouteCollection routeCollection, IDataPublisher publisher)
+        public EventPublisher(RouteCollection routeCollection, IDataPublisher publisher)
         {
             _routeCollection = routeCollection.Filter<TProducer>();
             _publisher = publisher;

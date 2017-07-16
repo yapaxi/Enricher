@@ -16,7 +16,7 @@ namespace Handler.DI
                 .RegisterType<AutofacForkResolver>()
                 .AsSelf()
                 .As<IForkHandlerMiddleware>()
-                .SingleInstance();
+                .InstancePerMatchingLifetimeScope("level2");
             
             base.Load(builder);
         }

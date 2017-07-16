@@ -59,7 +59,7 @@ namespace EventModel
 
     }
 
-    public class SuperRMAOrderEventEnricher : SuperEventEnricher<SuperRMAOrderEvent>
+    public class SelfSuperMegaRMAOrderEvent : ForkedEvent<SuperMegaRMAOrderEvent, Mega, Mega>
     {
 
     }

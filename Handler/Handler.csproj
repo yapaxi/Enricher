@@ -52,7 +52,7 @@
     <Compile Include="ForkHandlerBase.cs" />
     <Compile Include="IForkHandlerMiddleware.cs" />
     <Compile Include="IForkSubscriber.cs" />
-    <Compile Include="SourceEventPublisher.cs" />
+    <Compile Include="EventPublisher.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
