@@ -37,10 +37,7 @@ namespace EventModel
             string OrderRequestId { get; set; }
         }
 
-        public OrderEvent() { }
-
         public int Id { get; set; }
-
         public string OrderRequestId { get; set; }
     }
 
@@ -53,17 +50,9 @@ namespace EventModel
 
 
     [RouteName("rma-order")]
-    public class RMAOrderEvent : ForkedEvent<OrderEvent, R1, RMA>, OrderEvent.IModel, RMAOrderEvent.IModel
+    public class RMAOrderEvent : ForkedEvent<OrderEvent, R1, RMA>
     {
-        public interface IModel
-        {
-            int ClaimsCount { get; set; }
-        }
 
-        public int Id { get; set; }
-        public string OrderRequestId { get; set; }
-
-        public int ClaimsCount { get; set; }
     }
 
     [RouteName("super-order")]
@@ -74,7 +63,7 @@ namespace EventModel
     }
 
     [RouteName("super-rma-order")]
-    public class SuperRMAOrderEvent : ForkedEvent<RMAOrderEvent, RMA, Super>, OrderEvent.IModel, RMAOrderEvent.IModel
+    public class SuperRMAOrderEvent : ForkedEvent<RMAOrderEvent, RMA, Super>, OrderEvent.IModel
     {
         public int Id { get; set; }
         public string OrderRequestId { get; set; }
@@ -82,7 +71,7 @@ namespace EventModel
     }
 
     [RouteName("super-mega-rma-order")]
-    public class SuperMegaRMAOrderEvent : ForkedEvent<SuperRMAOrderEvent, Super, Mega>, OrderEvent.IModel, RMAOrderEvent.IModel
+    public class SuperMegaRMAOrderEvent : ForkedEvent<SuperRMAOrderEvent, Super, Mega>, OrderEvent.IModel
     {
         public int Id { get; set; }
         public string OrderRequestId { get; set; }
@@ -90,7 +79,7 @@ namespace EventModel
     }
 
     [RouteName("self-super-mega-rma-order")]
-    public class SelfSuperMegaRMAOrderEvent : ForkedEvent<SuperMegaRMAOrderEvent, Mega, Mega>, OrderEvent.IModel, RMAOrderEvent.IModel
+    public class SelfSuperMegaRMAOrderEvent : ForkedEvent<SuperMegaRMAOrderEvent, Mega, Mega>, OrderEvent.IModel
     {
         public int Id { get; set; }
         public string OrderRequestId { get; set; }
